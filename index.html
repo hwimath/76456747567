@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>휘매쓰 연산 챌린지!</title>
+    <!-- MathJax 설정 -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            }
+        };
+    </script>
+    <style>
+        body {
+            font-family: 'Nanum Gothic', sans-serif;
+            text-align: center;
+            background-color: #f0f8ff;
+            margin: 0;
+            padding: 0;
+        }
+        #game-container {
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+        }
+        #energy-bar {
+            width: 80%;
+            height: 30px;
+            background-color: #ddd;
+            margin: 20px auto;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        #energy {
+            width: 100%;
+            height: 100%;
+            background-color: #76c7c0;
+            transition: width 1s linear;
+        }
+        .hidden {
+            display: none;
+        }
+        #question {
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            padding: 0 20px;
+        }
+        .answer-buttons button, #submit-btn, #restart-btn, #popup-close-btn {
+            font-size: 1.2em;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #76c7c0;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .answer-buttons button:hover, #submit-btn:hover, #restart-btn:hover, #popup-close-btn:hover {
+            background-color: #5aa9a4;
+        }
+        #score, #lives, #total-time {
+            font-size: 1.2em;
+            margin: 10px;
+        }
+        #popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff9c4;
+            padding: 30px;
+            border: 2px solid #ffeb3b;
+            border-radius: 10px;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        #difficulty-selection button {
+            font-size: 1.2em;
+            margin: 10px;
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #76c7c0;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        #difficulty-selection button:hover {
+            background-color: #5aa9a4;
+        }
+        #input-section {
+            margin-top: 20px;
+        }
+        #input-answer {
+            font-size: 1.2em;
+            padding: 10px;
+            width: 150px;
+            border: 2px solid #76c7c0;
+            border-radius: 5px;
+        }
+        #total-game-time {
+            position: fixed;
+            top: 10px;
+            right: 20px;
+            font-size: 1em;
+            background-color: #fff;
+            padding: 10px;
+            border: 2px solid #76c7c0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="total-game-time">총 게임 시간: 0초</div>
+    <div id="game-container">
+        <h1>휘매쓰 연산 챌린지!</h1>
+        <div id="difficulty-selection">
+            <p>난이도를 선택하세요:</p>
+            <button onclick="startGame('최상')">최상</button>
+            <button onclick="startGame('상')">상</button>
+            <button onclick="startGame('중')">중</button>
+            <button onclick="startGame('하')">하</button>
+        </div>
+        <div id="game" class="hidden">
+            <div id="energy-bar">
+                <div id="energy"></div>
+            </div>
+            <div id="question"></div>
+            <div id="answer-section">
+                <!-- 동적 입력 요소가 여기 나타납니다 -->
+            </div>
+            <div class="answer-buttons hidden" id="comparison-buttons">
+                <button onclick="checkAnswer('>')">></button>
+                <button onclick="checkAnswer('<')"><</button>
+                <button onclick="checkAnswer('=')">=</button>
+            </div>
+            <div id="input-section" class="hidden">
+                <input type="number" id="input-answer" placeholder="답을 입력하세요">
+                <button id="submit-btn" onclick="submitInput()">제출</button>
+            </div>
+            <div id="score">점수: 0</div>
+            <div id="lives">남은 기회: 3</div>
+        </div>
+    </div>
+    <div id="popup"></div>
+    <script>
+        const problems = [
+            // 유형 1: 수의 대소 비교 문제 (20개)
+            { type: 'comparison', question: '$+2 \\ □ \\ +5$', answer: '<' },
+            { type: 'comparison', question: '$-3 \\ □ \\ -7$', answer: '>' },
+            { type: 'comparison', question: '$-1 \\ □ \\ 0$', answer: '<' },
+            { type: 'comparison', question: '$+5 \\ □ \\ -\\frac{5}{3}$', answer: '>' },
+            { type: 'comparison', question: '$+2 \\ □ \\ -6$', answer: '>' },
+            { type: 'comparison', question: '$-2 \\ □ \\ 0$', answer: '<' },
+            { type: 'comparison', question: '$+2 \\ □ \\ -4$', answer: '>' },
+            { type: 'comparison', question: '$-1 \\ □ \\ +3$', answer: '<' },
+            { type: 'comparison', question: '$+3 \\ □ \\ +2$', answer: '>' },
+            { type: 'comparison', question: '$+6 \\ □ \\ +10$', answer: '<' },
+            { type: 'comparison', question: '$-5 \\ □ \\ -3$', answer: '<' },
+            { type: 'comparison', question: '$-4 \\ □ \\ -6$', answer: '>' },
+            { type: 'comparison', question: '$-9 \\ □ \\ -8$', answer: '<' },
+            { type: 'comparison', question: '$+1 \\ □ \\ 0$', answer: '>' },
+            { type: 'comparison', question: '$-12 \\ □ \\ 0$', answer: '<' },
+            { type: 'comparison', question: '$-1.7 \\ □ \\ +2.7$', answer: '<' },
+            { type: 'comparison', question: '$+2.3 \\ □ \\ +1.5$', answer: '>' },
+            { type: 'comparison', question: '$+\\frac{1}{2} \\ □ \\ -\\frac{1}{5}$', answer: '>' },
+            { type: 'comparison', question: '$+\\frac{1}{3} \\ □ \\ +4$', answer: '<' },
+            { type: 'comparison', question: '$-\\frac{1}{10} \\ □ \\ +0.2$', answer: '<' },
+        
+            // 유형 2: 정수 개수 문제 (20개) - 정답 수정됨
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{9}{5} \\leq x \\leq 4$', answer: '6' },
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-3 < x \\leq 2$', answer: '5' }, // 수정됨
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{5}{3} \\leq x < 3$', answer: '4' }, // 수정됨
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{7}{4} < x \\leq 5$', answer: '7' },
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-2 \\leq x < 4$', answer: '6' }, // 수정됨
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{4}{3} < x \\leq 1$', answer: '3' }, // 수정됨
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{6}{5} < x \\leq 4$', answer: '6' },
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{8}{7} \\leq x < 4$', answer: '5' }, // 수정됨
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-1 < x \\leq 4$', answer: '5' }, // 수정됨
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{9}{5} < x \\leq 4$', answer: '6' },
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-2.5 \\leq x \\leq 4$', answer: '7' },
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-1.8 < x \\leq 4$', answer: '6' },
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{3}{2} \\leq x < 4$', answer: '5' }, // 수정됨
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-2 < x \\leq 4$', answer: '6' }, // 수정됨
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-4 < x \\leq 4$', answer: '8' }, // 수정됨
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{9}{5} \\leq x \\leq 4$', answer: '6' },
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{5}{3} < x \\leq 4$', answer: '6' },
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-1 \\leq x \\leq 4$', answer: '6' },
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-\\frac{7}{5} < x \\leq 4$', answer: '6' },
+            { type: 'count', question: '부등식을 만족시키는 정수의 개수를 구하시오. $-3 < x \\leq 4$', answer: '7' }, // 수정됨
+        
+            // 유형 3: 가장 가까운 정수 문제 (20개) - 모두 정답 확인됨
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $\\frac{8}{3}$', answer: '3' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $-2.7$', answer: '-3' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $4.2$', answer: '4' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $5.5$', answer: '6' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $-1.3$', answer: '-1' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $3.6$', answer: '4' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $7.2$', answer: '7' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $-4.8$', answer: '-5' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $2.5$', answer: '3' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $-0.4$', answer: '0' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $6.7$', answer: '7' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $-3.3$', answer: '-3' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $9.1$', answer: '9' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $-5.5$', answer: '-6' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $1.8$', answer: '2' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $-6.2$', answer: '-6' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $0.3$', answer: '0' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $10.6$', answer: '11' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $-7.7$', answer: '-8' },
+            { type: 'nearest', question: '가장 가까운 정수를 구하시오. $4.4$', answer: '4' }
+        ];
+
+        let currentProblem;
+        let score = 0;
+        let lives = 3;
+        let totalTime = 0;
+        let gameStartTime;
+        let totalTimeInterval;
+        let energyInterval;
+        let timeLimit = null;
+        let difficultyPoints = {
+            '최상': 20,
+            '상': 15,
+            '중': 13,
+            '하': 10
+        };
+        let selectedDifficulty = '하';
+        let exemptionAvailable = true; // 면제권 사용 가능 여부
+
+        function startGame(difficulty) {
+            selectedDifficulty = difficulty;
+            document.getElementById('difficulty-selection').classList.add('hidden');
+            document.getElementById('game').classList.remove('hidden');
+
+            // 초기화
+            score = 0;
+            lives = 3;
+            totalTime = 0;
+            document.getElementById('score').innerText = `점수: ${score}`;
+            document.getElementById('lives').innerText = `남은 기회: ${lives}`;
+            document.getElementById('energy').style.width = '100%';
+
+            // 설정 시간
+            if (difficulty === '최상') {
+                timeLimit = 20;
+            } else if (difficulty === '상') {
+                timeLimit = 30;
+            } else if (difficulty === '중') {
+                timeLimit = 40;
+            } else {
+                timeLimit = null; // 시간제한 없음
+                document.getElementById('energy-bar').classList.add('hidden');
+            }
+
+            // 게임 전체 시간 시작
+            gameStartTime = Date.now();
+            totalTimeInterval = setInterval(() => {
+                totalTime = Math.floor((Date.now() - gameStartTime) / 1000);
+                document.getElementById('total-game-time').innerText = `총 게임 시간: ${totalTime}초`;
+            }, 1000);
+
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            if (lives <= 0) {
+                endGame('남은 기회가 없습니다!');
+                return;
+            }
+
+            if (problems.length === 0) {
+                // 모든 문제가 끝났을 때 랜덤으로 문제를 계속 제공
+                currentProblem = getRandomProblem();
+            } else {
+                currentProblem = problems.shift();
+            }
+
+            document.getElementById('question').innerHTML = currentProblem.question;
+            MathJax.typesetPromise();
+
+            displayAnswerSection(currentProblem.type);
+
+            // 에너지 바 초기화
+            if (timeLimit !== null) {
+                document.getElementById('energy').style.width = '100%';
+                clearInterval(energyInterval);
+                let timeLeft = timeLimit;
+                energyInterval = setInterval(() => {
+                    timeLeft--;
+                    let percentage = (timeLeft / timeLimit) * 100;
+                    if (percentage < 0) percentage = 0;
+                    document.getElementById('energy').style.width = `${percentage}%`;
+
+                    if (timeLeft <= 0) {
+                        clearInterval(energyInterval);
+                        alert('시간이 초과되었습니다!');
+                        handleWrongAnswer();
+                        nextQuestion();
+                    }
+                }, 1000);
+            }
+        }
+
+        function getRandomProblem() {
+            const randomIndex = Math.floor(Math.random() * problems.length);
+            return problems[randomIndex];
+        }
+
+        function displayAnswerSection(type) {
+            document.getElementById('comparison-buttons').classList.add('hidden');
+            document.getElementById('input-section').classList.add('hidden');
+            if (type === 'comparison') {
+                document.getElementById('comparison-buttons').classList.remove('hidden');
+            } else {
+                document.getElementById('input-section').classList.remove('hidden');
+            }
+        }
+
+        function checkAnswer(answer) {
+            clearInterval(energyInterval);
+            if (answer === currentProblem.answer) {
+                score += difficultyPoints[selectedDifficulty];
+                document.getElementById('score').innerText = `점수: ${score}`;
+                alert('정답입니다!');
+                checkRandomReward();
+            } else {
+                handleWrongAnswer();
+                alert(`틀렸습니다. 정답은 ${currentProblem.answer}입니다.`);
+            }
+            nextQuestion();
+        }
+
+        function submitInput() {
+            clearInterval(energyInterval);
+            const userInput = document.getElementById('input-answer').value.trim();
+            if (userInput === '') {
+                alert('답을 입력해주세요.');
+                // 다시 타이머 시작
+                if (timeLimit !== null) {
+                    let timeLeft = timeLimit;
+                    energyInterval = setInterval(() => {
+                        timeLeft--;
+                        let percentage = (timeLeft / timeLimit) * 100;
+                        if (percentage < 0) percentage = 0;
+                        document.getElementById('energy').style.width = `${percentage}%`;
+
+                        if (timeLeft <= 0) {
+                            clearInterval(energyInterval);
+                            alert('시간이 초과되었습니다!');
+                            handleWrongAnswer();
+                            nextQuestion();
+                        }
+                    }, 1000);
+                }
+                return;
+            }
+
+            if (userInput === currentProblem.answer) {
+                score += difficultyPoints[selectedDifficulty];
+                document.getElementById('score').innerText = `점수: ${score}`;
+                alert('정답입니다!');
+                checkRandomReward();
+            } else {
+                handleWrongAnswer();
+                alert(`틀렸습니다. 정답은 ${currentProblem.answer}입니다.`);
+            }
+            // 입력 필드 초기화
+            document.getElementById('input-answer').value = '';
+            nextQuestion();
+        }
+
+        function handleWrongAnswer() {
+            lives--;
+            updateLives();
+            if (lives <= 0) {
+                endGame('남은 기회가 없습니다!');
+                return;
+            }
+            checkRandomReward();
+        }
+
+        function updateLives() {
+            document.getElementById('lives').innerText = `남은 기회: ${lives}`;
+        }
+
+        function endGame(message) {
+            clearInterval(totalTimeInterval);
+            clearInterval(energyInterval);
+            document.getElementById('game').classList.add('hidden');
+            const popup = document.getElementById('popup');
+            popup.innerHTML = `
+                <h2>게임 종료</h2>
+                <p>${message}</p>
+                <p>최종 점수: ${score}</p>
+                <p>총 게임 시간: ${totalTime}초</p>
+                <button id="restart-btn" onclick="restartGame()">다시 시작</button>
+            `;
+            popup.style.display = 'block';
+        }
+
+        function restartGame() {
+            // 페이지 새로 고침
+            location.reload();
+        }
+
+        function checkRandomReward() {
+            const rand = Math.floor(Math.random() * 10000) + 1; // 1부터 10000까지
+            let reward = null;
+
+            if (rand === 1) { // 1/10000
+                reward = '5000원 상품권';
+            } else if (rand <= 10) { // 10/10000 = 1/1000
+                reward = '3000원 상품권';
+            } else if (rand <= 20) { // 20/10000 = 1/500
+                reward = '1회 면제권';
+            }
+
+            if (reward) {
+                showRewardPopup(reward);
+            }
+        }
+
+        function showRewardPopup(reward) {
+            const popup = document.getElementById('popup');
+            popup.innerHTML = `
+                <h2>축하합니다!</h2>
+                <p>${reward}을(를) 획득하셨습니다!</p>
+                <button id="popup-close-btn" onclick="closePopup()">닫기</button>
+            `;
+            popup.style.display = 'block';
+        }
+
+        function closePopup() {
+            document.getElementById('popup').style.display = 'none';
+        }
+
+        // 클릭 시 팝업 닫기
+        window.onclick = function(event) {
+            const popup = document.getElementById('popup');
+            if (event.target == popup) {
+                popup.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
